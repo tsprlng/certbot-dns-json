@@ -491,17 +491,17 @@ s.serve_forever()" """
         response, validation = achall.response_and_validation()
 
         json_data = OrderedDict()
-        json_data[FIELD_CMD] = COMMAND_PERFORM
-        json_data[FIELD_TYPE] = achall.chall.typ
+        #json_data[FIELD_CMD] = COMMAND_PERFORM
+        #json_data[FIELD_TYPE] = achall.chall.typ
         json_data[FIELD_DOMAIN] = achall.domain
-        json_data[FIELD_TOKEN] = b64.b64encode(achall.chall.token)
-        json_data[FIELD_VALIDATION] = validation
-        json_data[FIELD_TXT_DOMAIN] = achall.validation_domain_name(achall.domain)
+        #json_data[FIELD_TOKEN] = b64.b64encode(achall.chall.token)
+        #json_data[FIELD_VALIDATION] = validation
+        #json_data[FIELD_TXT_DOMAIN] = achall.validation_domain_name(achall.domain)
         json_data[FIELD_KEY_AUTH] = response.key_authorization
 
         json_data = self._json_sanitize_dict(json_data)
 
-        self._json_out(json_data, True)
+        self._json_out({'challenge':json_data}, True)
 
         return response
 
