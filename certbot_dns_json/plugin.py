@@ -150,31 +150,6 @@ class Authenticator(common.Plugin):
     def cleanup(self, achalls):
         pass
 
-    def _get_json_to_kwargs(self, json_data):
-        """
-        Augments json data before passing to the handler script.
-        Prefixes all keys with cbot_ value to avoid clashes + serializes
-        itself to JSON - for JSON parsing stuff.
-
-        :param json_data:
-        :return:
-        """
-        n_data = OrderedDict()
-        for k in json_data:
-            val = json_data[k]
-            if k == 'command':
-                continue
-            if isinstance(val, float):
-                val = str(math.ceil(val))
-            if not isinstance(val, str):
-                val = str(val)
-            if val is not None:
-                n_data[k] = val
-                n_data['cbot_' + k] = val
-
-        n_data['cbot_json'] = self._json_dumps(json_data)
-        return n_data
-
     def _perform_dns01_challenge(self, achall):
         response, validation = achall.response_and_validation()
 
@@ -395,14 +370,6 @@ class Authenticator(common.Plugin):
             return os.path.abspath(fpath)
         except:
             return fpath
-
-    def _get_file_mtime(self, file):
-        """
-        Returns file modification time
-        :param file:
-        :return:
-        """
-        return os.path.getmtime(file)
 
     def _is_text_mode(self):
         """
