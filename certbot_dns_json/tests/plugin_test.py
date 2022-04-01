@@ -70,7 +70,7 @@ class GetAuthorizationsTest(unittest.TestCase):
 
     def setUp(self):
         from certbot.auth_handler import AuthHandler
-        from certbot_external_auth.plugin import AuthenticatorOut
+        from certbot_dns_json.plugin import Authenticator
 
         self.name = 'certbot-external-auth'
         self.name_cfg = self.name.replace('-', '_') + '_'
@@ -107,7 +107,7 @@ class GetAuthorizationsTest(unittest.TestCase):
         zope.component.provideUtility(
             mock.Mock(debug_challenges=False), interfaces.IConfig)
 
-        self.mock_auth = AuthenticatorOut(self.config, self.name)
+		  self.mock_auth = Authenticator(self.config, self.name)
 
         self.mock_auth.get_chall_pref = mock.MagicMock()
         self.mock_auth.get_chall_pref.return_value = [challenges.TLSSNI01]

@@ -1,7 +1,7 @@
 from setuptools import setup
 from setuptools import find_packages
 
-version = '0.1.2'
+version = '0.0.1'
 
 install_requires = [
     'acme',
@@ -10,15 +10,11 @@ install_requires = [
 ]
 
 setup(
-    name='certbot-ext-auth',
+    name='certbot-dns-json',
     version=version,
-    description="External authenticator for Certbot",
-    url='https://github.com/EnigmaBridge/certbot-external-auth',
-    author="Enigma Bridge",
-    author_email='support@keychest.net',
-    package_data={'certbot-ext-auto': ['LICENSE']},
-    long_description=open('README.md', encoding="utf-8").read(),
-    long_description_content_type="text/markdown",
+    description="JSON output for external DNS for Certbot",
+    url='https://github.com/tsprlng/certbot-dns-json',
+    package_data={'certbot-dns-json': ['LICENSE']},
     python_requires='>=2.6,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*',
     classifiers=[
         'Intended Audience :: System Administrators',
@@ -44,7 +40,7 @@ setup(
     packages=find_packages(),
     entry_points={
         'certbot.plugins': [
-            'out = certbot_external_auth.plugin:AuthenticatorOut',
+            'dns-json = certbot_dns_json.plugin:Authenticator',
         ],
     },
 )

@@ -44,7 +44,7 @@ from certbot.plugins import common
 
 from six.moves import queue  # pylint: disable=import-error
 
-from certbot_external_auth import *
+from certbot_dns_json import *
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class AutoJSONEncoder(json.JSONEncoder):
 @zope.interface.implementer(interfaces.IInstaller)
 @zope.interface.provider(interfaces.IPluginFactory)
 @zope.interface.implementer(interfaces.IReporter)
-class AuthenticatorOut(common.Plugin):
+class Authenticator(common.Plugin):
     """Manual Authenticator.
 
     This plugin requires user's manual intervention in setting up a HTTP
@@ -150,7 +150,7 @@ s.serve_forever()" """
     _msg_type = collections.namedtuple('ReporterMsg', 'priority text on_crash')
 
     def __init__(self, *args, **kwargs):
-        super(AuthenticatorOut, self).__init__(*args, **kwargs)
+        super(Authenticator, self).__init__(*args, **kwargs)
         self._root = (tempfile.mkdtemp() if self.conf("test-mode")
                       else "/tmp/certbot")
         self._httpd = None
