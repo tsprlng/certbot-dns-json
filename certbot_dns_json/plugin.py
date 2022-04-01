@@ -15,8 +15,6 @@ import datetime
 
 from collections import OrderedDict
 
-import zope.component
-import zope.interface
 from acme import challenges
 from acme import errors as acme_errors
 
@@ -51,9 +49,7 @@ class AutoJSONEncoder(json.JSONEncoder):
             return super(AutoJSONEncoder, self).default(o)
 
 
-@zope.interface.implementer(interfaces.IAuthenticator)
-@zope.interface.provider(interfaces.IPluginFactory)
-class Authenticator(common.Plugin):
+class Authenticator(common.Plugin, interfaces.Authenticator):
     """Manual Authenticator.
 
     This plugin requires user's manual intervention in setting up a HTTP
@@ -91,7 +87,6 @@ class Authenticator(common.Plugin):
         # Re-register displayer - stderr only displayer
         #displayer = display_util.NoninteractiveDisplay(sys.stderr)
         displayer = display_util.FileDisplay(sys.stderr, False)
-        zope.component.provideUtility(displayer)
 
         # Non-interactive not yet supported
         if self.config.noninteractive_mode and not self.conf("test-mode"):
