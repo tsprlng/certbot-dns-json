@@ -233,6 +233,7 @@ s.serve_forever()" """
         if self._is_classic_handler_mode() and self._call_handler("post-perform") is None:
             raise errors.PluginError("Error in calling the handler to do the post-perform (challenge) stage")
 
+        input("Press return to verify...\n")
         return responses
 
     def add_message(self, msg, priority, on_crash=True):
@@ -500,35 +501,7 @@ s.serve_forever()" """
 
         json_data = self._json_sanitize_dict(json_data)
 
-        if not self.conf("test-mode"):
-            if self._is_text_mode():
-                self._notify_and_wait(
-                    self._get_message(achall).format(
-                        validation=json_data[FIELD_VALIDATION],
-                        domain=json_data[FIELD_DOMAIN],
-                        response=response))
-
-            elif self._is_json_mode():
-                self._json_out_and_wait(json_data)
-
-            elif self._is_handler_mode():
-                self._json_out(json_data, True)
-                if self._call_handler("perform", **(self._get_json_to_kwargs(json_data))) is None:
-                    raise errors.PluginError("Error in calling the handler to do the perform (challenge) stage")
-
-            else:
-                raise errors.PluginError("Unknown plugin mode selected")
-
-        try:
-            verification_status = response.simple_verify(
-                achall.chall, achall.domain,
-                achall.account_key.public_key())
-        except acme_errors.DependencyError:
-            logger.warning("Self verification requires optional "
-                           "dependency `dnspython` to be installed.")
-        else:
-            if not verification_status:
-                logger.warning("Self-verify of challenge failed.")
+        self._json_out(json_data, True)
 
         return response
 
