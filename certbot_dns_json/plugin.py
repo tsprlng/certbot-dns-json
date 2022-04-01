@@ -3,7 +3,6 @@
 
 """Manual plugin on stereoids."""
 
-from past.builtins import basestring
 from builtins import bytes
 import six
 
@@ -361,7 +360,7 @@ s.serve_forever()" """
         cur_record[FIELD_TOKEN] = b64.b64encode(achall.chall.token)
         if type(cur_record[FIELD_TOKEN]) == bytes:
             cur_record[FIELD_TOKEN] = cur_record[FIELD_TOKEN].decode('UTF-8')
-        cur_record[FIELD_VALIDATION] = validation if isinstance(validation, basestring) else ''
+        cur_record[FIELD_VALIDATION] = validation if isinstance(validation, str) else ''
         cur_record[FIELD_KEY_AUTH] = response.key_authorization.decode('UTF-8') if isinstance(response.key_authorization, bytes) else response.key_authorization
         cur_record[FIELD_VALIDATED] = None
         cur_record[FIELD_ERROR] = None
@@ -402,7 +401,7 @@ s.serve_forever()" """
                 continue
             if isinstance(val, float):
                 val = str(math.ceil(val))
-            if not isinstance(val, (str, basestring)):
+            if not isinstance(val, str):
                 val = str(val)
             if val is not None:
                 n_data[k] = val
