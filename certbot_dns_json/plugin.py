@@ -30,11 +30,6 @@ import zope.interface
 from acme import challenges
 from acme import errors as acme_errors
 
-try:
-    from acme.jose import b64
-except:
-    from josepy import b64
-
 from certbot import errors
 from certbot import interfaces
 from certbot import reverter
@@ -195,19 +190,11 @@ s.serve_forever()" """
             raise errors.PluginError("dehydrated-dns switch is allowed only with handler specified")
 
     def more_info(self):  # pylint: disable=missing-docstring,no-self-use
-        return ("This plugin requires user's manual intervention in setting "
-                "up challenges to prove control of a domain and does not need "
-                "to be run as a privileged process. When solving "
-                "http-01 challenges, the user is responsible for setting up "
-                "an HTTP server. Alternatively, instructions are shown on how "
-                "to use Python's built-in HTTP server. The user is "
-                "responsible for configuration of a domain's DNS when solving "
-                "dns-01 challenges. The type of challenges used can be "
-                "controlled through the --preferred-challenges flag.")
+        return ("It's like --manual for DNS challenges except it prints less.")
 
     def get_chall_pref(self, domain):
         # pylint: disable=missing-docstring,no-self-use,unused-argument
-        return [challenges.DNS01, challenges.HTTP01]
+        return [challenges.DNS01]
 
     def perform(self, achalls):
         """
@@ -217,9 +204,7 @@ s.serve_forever()" """
         """
         # pylint: disable=missing-docstring
         self._get_ip_logging_permission()
-        mapping = {"http-01": self._perform_http01_challenge,
-                   "dns-01": self._perform_dns01_challenge
-                   }
+        mapping = {"dns-01": self._perform_dns01_challenge}
         responses = []
         # TODO: group achalls by the same socket.gethostbyname(_ex)
         # and prompt only once per server (one "echo -n" per domain)
@@ -313,78 +298,7 @@ s.serve_forever()" """
                 sock.close()
 
     def cleanup(self, achalls):
-        """
-        Cleaning up challenges, called by AuthHandler
-        :param achalls:
-        :return:
-        """
-        # pylint: disable=missing-docstring
-
-        if self._is_classic_handler_mode() \
-                and not self._is_handler_broken() \
-                and self._call_handler("pre-cleanup") is None:
-            raise errors.PluginError("Error in calling the handler to do the pre-cleanup stage")
-
-        for achall in achalls:
-            cur_record = self._get_cleanup_json(achall)
-
-            if self._is_json_mode() or self._is_handler_mode():
-                self._json_out(cur_record, True)
-
-            if self._is_handler_mode() \
-                    and not self._is_handler_broken() \
-                    and self._call_handler("cleanup", **(self._get_json_to_kwargs(cur_record))) is None:
-                raise errors.PluginError("Error in calling the handler to do the cleanup stage")
-
-            if isinstance(achall.chall, challenges.HTTP01):
-                self._cleanup_http01_challenge(achall)
-
-        if self._is_classic_handler_mode() \
-                and not self._is_handler_broken() \
-                and self._call_handler("post-cleanup") is None:
-            raise errors.PluginError("Error in calling the handler to do the post-cleanup stage")
-
-    def _get_cleanup_json(self, achall):
-        response, validation = achall.response_and_validation()
-
-        cur_record = OrderedDict()
-        cur_record[FIELD_CMD] = COMMAND_CLEANUP
-        cur_record[FIELD_TYPE] = achall.chall.typ
-
-        if isinstance(achall.chall, challenges.HTTP01):
-            pass
-        elif isinstance(achall.chall, challenges.DNS01):
-            pass
-
-        cur_record[FIELD_STATUS] = None
-        cur_record[FIELD_DOMAIN] = achall.domain
-        cur_record[FIELD_TOKEN] = b64.b64encode(achall.chall.token)
-        if type(cur_record[FIELD_TOKEN]) == bytes:
-            cur_record[FIELD_TOKEN] = cur_record[FIELD_TOKEN].decode('UTF-8')
-        cur_record[FIELD_VALIDATION] = validation if isinstance(validation, str) else ''
-        cur_record[FIELD_KEY_AUTH] = response.key_authorization.decode('UTF-8') if isinstance(response.key_authorization, bytes) else response.key_authorization
-        cur_record[FIELD_VALIDATED] = None
-        cur_record[FIELD_ERROR] = None
-
-        if achall.status is not None:
-            try:
-                cur_record[FIELD_STATUS] = achall.status.name
-            except:
-                pass
-
-        if achall.error is not None:
-            try:
-                cur_record[FIELD_ERROR] = str(achall.error)
-            except:
-                cur_record[FIELD_ERROR] = 'ERROR'
-
-        if achall.validated is not None:
-            try:
-                cur_record[FIELD_VALIDATED] = str(achall.validated)
-            except:
-                cur_record[FIELD_VALIDATED] = 'ERROR'
-
-        return cur_record
+        pass
 
     def _get_json_to_kwargs(self, json_data):
         """
@@ -411,82 +325,6 @@ s.serve_forever()" """
         n_data['cbot_json'] = self._json_dumps(json_data)
         return n_data
 
-    def _perform_http01_challenge(self, achall):
-        # same path for each challenge response would be easier for
-        # users, but will not work if multiple domains point at the
-        # same server: default command doesn't support virtual hosts
-        response, validation = achall.response_and_validation()
-        port = (response.port if self.config.http01_port is None
-                else int(self.config.http01_port))
-
-        command = self.CMD_TEMPLATE.format(
-            root=self._root, achall=achall, response=response,
-            validation=pipes.quote(validation),
-            encoded_token=achall.chall.encode("token"),
-            port=port)
-
-        json_data = OrderedDict()
-        json_data[FIELD_CMD] = COMMAND_PERFORM
-        json_data[FIELD_TYPE] = achall.chall.typ
-        json_data[FIELD_DOMAIN] = achall.domain
-        json_data[FIELD_TOKEN] = b64.b64encode(achall.chall.token)
-        json_data[FIELD_VALIDATION] = validation
-        json_data[FIELD_URI] = achall.chall.uri(achall.domain)
-        json_data['command'] = command
-        json_data[FIELD_KEY_AUTH] = response.key_authorization
-
-        json_data = self._json_sanitize_dict(json_data)
-
-        if self.conf("test-mode"):
-            logger.debug("Test mode. Executing the manual command: %s", command)
-            # sh shipped with OS X does't support echo -n, but supports printf
-            try:
-                self._httpd = subprocess.Popen(
-                    command,
-                    # don't care about setting stdout and stderr,
-                    # we're in test mode anyway
-                    shell=True,
-                    executable=None,
-                    # "preexec_fn" is UNIX specific, but so is "command"
-                    preexec_fn=os.setsid)
-            except OSError as error:  # ValueError should not happen!
-                logger.debug(
-                    "Couldn't execute manual command: %s", error, exc_info=True)
-                return False
-            logger.debug("Manual command running as PID %s.", self._httpd.pid)
-            # give it some time to bootstrap, before we try to verify
-            # (cert generation in case of simpleHttpS might take time)
-            self._test_mode_busy_wait(port)
-
-            if self._httpd.poll() is not None:
-                raise errors.Error("Couldn't execute manual command")
-        else:
-            if self._is_text_mode():
-                self._notify_and_wait(
-                    self._get_message(achall).format(
-                        validation=validation,
-                        response=response,
-                        uri=achall.chall.uri(achall.domain),
-                        command=command))
-
-            elif self._is_json_mode():
-                self._json_out_and_wait(json_data)
-
-            elif self._is_handler_mode():
-                self._json_out(json_data, True)
-                if self._call_handler("perform", **(self._get_json_to_kwargs(json_data))) is None:
-                    raise errors.PluginError("Error in calling the handler to do the perform (challenge) stage")
-
-            else:
-                raise errors.PluginError("Unknown plugin mode selected")
-
-        if not response.simple_verify(
-                achall.chall, achall.domain,
-                achall.account_key.public_key(), self.config.http01_port):
-            logger.warning("Self-verify of challenge failed.")
-
-        return response
-
     def _perform_dns01_challenge(self, achall):
         response, validation = achall.response_and_validation()
 
@@ -494,7 +332,6 @@ s.serve_forever()" """
         #json_data[FIELD_CMD] = COMMAND_PERFORM
         #json_data[FIELD_TYPE] = achall.chall.typ
         json_data[FIELD_DOMAIN] = achall.domain
-        #json_data[FIELD_TOKEN] = b64.b64encode(achall.chall.token)
         #json_data[FIELD_VALIDATION] = validation
         #json_data[FIELD_TXT_DOMAIN] = achall.validation_domain_name(achall.domain)
         json_data[FIELD_KEY_AUTH] = response.key_authorization
@@ -504,19 +341,6 @@ s.serve_forever()" """
         self._json_out({'challenge':json_data}, True)
 
         return response
-
-    def _cleanup_http01_challenge(self, achall):
-        # pylint: disable=missing-docstring,unused-argument
-        if self.conf("test-mode"):
-            assert self._httpd is not None, (
-                "cleanup() must be called after perform()")
-            if self._httpd.poll() is None:
-                logger.debug("Terminating manual command process")
-                os.killpg(self._httpd.pid, signal.SIGTERM)
-            else:
-                logger.debug("Manual command process already terminated "
-                             "with %s code", self._httpd.returncode)
-            shutil.rmtree(self._root)
 
     #
     # Installer section
