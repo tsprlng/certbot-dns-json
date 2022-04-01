@@ -858,23 +858,8 @@ s.serve_forever()" """
         Configures public ip logging config keys from the env.
         :return:
         """
-        if self.config.noninteractive_mode and self.conf("public-ip-logging-ok"):
-            self.config.namespace.certbot_external_auth_out_public_ip_logging_ok = True
-            self.config.namespace.manual_public_ip_logging_ok = True
-            return
-
-        if self.config.noninteractive_mode or (self._is_json_mode() and not self.conf("public-ip-logging-ok")):
-            raise errors.PluginError("Must agree to the public IP logging to proceed")
-
-        if not (self.conf("test-mode") or self.conf("public-ip-logging-ok")):
-            if not zope.component.getUtility(interfaces.IDisplay).yesno(
-                    self.IP_DISCLAIMER, "Yes", "No",
-                    cli_flag="--certbot-external-auth:out-public-ip-logging-ok"):
-                raise errors.PluginError("Must agree to the public IP logging to proceed")
-
-            else:
-                self.config.namespace.certbot_external_auth_out_public_ip_logging_ok = True
-                self.config.namespace.manual_public_ip_logging_ok = True
+        self.config.namespace.certbot_external_auth_out_public_ip_logging_ok = True
+        self.config.namespace.manual_public_ip_logging_ok = True
 
     def _get_message(self, achall):
         """
