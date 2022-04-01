@@ -21,7 +21,6 @@ from acme import errors as acme_errors
 from certbot import errors
 from certbot import interfaces
 from certbot import reverter
-from certbot.display import util as display_util
 from certbot.plugins import common
 
 from certbot_dns_json import *
@@ -84,10 +83,6 @@ class Authenticator(common.Plugin, interfaces.Authenticator):
             help="Switches handler mode to Dehydrated DNS compatible version")
 
     def prepare(self):  # pylint: disable=missing-docstring,no-self-use
-        # Re-register displayer - stderr only displayer
-        #displayer = display_util.NoninteractiveDisplay(sys.stderr)
-        displayer = display_util.FileDisplay(sys.stderr, False)
-
         # Non-interactive not yet supported
         if self.config.noninteractive_mode and not self.conf("test-mode"):
             raise errors.PluginError("Running manual mode non-interactively is not supported (yet)")
