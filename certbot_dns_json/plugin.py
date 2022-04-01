@@ -3,7 +3,6 @@
 
 """Manual plugin on stereoids."""
 
-import calendar
 import collections
 import json
 import logging
@@ -11,7 +10,6 @@ import math
 import os
 import subprocess
 import sys
-import tempfile
 import time
 import datetime
 
@@ -54,9 +52,7 @@ class AutoJSONEncoder(json.JSONEncoder):
 
 
 @zope.interface.implementer(interfaces.IAuthenticator)
-@zope.interface.implementer(interfaces.IInstaller)
 @zope.interface.provider(interfaces.IPluginFactory)
-@zope.interface.implementer(interfaces.IReporter)
 class Authenticator(common.Plugin):
     """Manual Authenticator.
 
@@ -74,18 +70,11 @@ class Authenticator(common.Plugin):
 
     def __init__(self, *args, **kwargs):
         super(Authenticator, self).__init__(*args, **kwargs)
-        self._root = (tempfile.mkdtemp() if self.conf("test-mode")
-                      else "/tmp/certbot")
-        self._httpd = None
-        self._start_time = calendar.timegm(time.gmtime())
         self._handler_file_problem = False
 
         # Set up reverter
         self.reverter = reverter.Reverter(self.config)
         self.reverter.recovery_routine()
-
-        # Reporter
-        self.orig_reporter = None
 
     @classmethod
     def add_parser_arguments(cls, add):
@@ -99,10 +88,6 @@ class Authenticator(common.Plugin):
             help="Switches handler mode to Dehydrated DNS compatible version")
 
     def prepare(self):  # pylint: disable=missing-docstring,no-self-use
-        # Re-register reporter - json only report
-        self.orig_reporter = zope.component.getUtility(interfaces.IReporter)
-        zope.component.provideUtility(self, provides=interfaces.IReporter)
-
         # Re-register displayer - stderr only displayer
         #displayer = display_util.NoninteractiveDisplay(sys.stderr)
         displayer = display_util.FileDisplay(sys.stderr, False)
@@ -164,67 +149,6 @@ class Authenticator(common.Plugin):
         self._json_out({'challenge':json_data}, True)
 
         return response
-
-    #
-    # Installer section
-    #
-
-    def get_all_names(self):
-        return []
-
-    def deploy_cert(self, domain, cert_path, key_path, chain_path, fullchain_path):
-        cur_record = OrderedDict()
-        cur_record[FIELD_CMD] = COMMAND_DEPLOY_CERT
-        cur_record[FIELD_DOMAIN] = domain
-        cur_record[FIELD_CERT_PATH] = cert_path
-        cur_record[FIELD_KEY_PATH] = key_path
-        cur_record[FIELD_CHAIN_PATH] = chain_path
-        cur_record[FIELD_FULLCHAIN_PATH] = fullchain_path
-        cur_record[FIELD_TIMESTAMP] = self._start_time
-        cur_record[FIELD_CERT_TIMESTAMP] = self._get_file_mtime(cert_path)
-
-        if self._is_json_mode() or self._is_handler_mode():
-            self._json_out(cur_record, True)
-
-        hook_cmd = "deploy_cert" if cur_record[FIELD_CERT_TIMESTAMP] >= cur_record[FIELD_TIMESTAMP] else 'unchanged_cert'
-        if self._is_handler_mode() and self._call_handler(hook_cmd, **(self._get_json_to_kwargs(cur_record))) is None:
-            raise errors.PluginError("Error in calling the handler to do the deploy_cert stage")
-        pass
-
-    def enhance(self, domain, enhancement, options=None):
-        pass  # pragma: no cover
-
-    def supported_enhancements(self):
-        return []
-
-    def get_all_certs_keys(self):
-        return []
-
-    def save(self, title=None, temporary=False):
-        cur_record = OrderedDict()
-        cur_record[FIELD_CMD] = COMMAND_SAVE
-        cur_record['title'] = title
-        cur_record['temporary'] = temporary
-        if self._is_json_mode() or self._is_handler_mode():
-            self._json_out(cur_record, True)
-
-    def rollback_checkpoints(self, rollback=1):
-       pass  # pragma: no cover
-
-    def recovery_routine(self):
-        pass  # pragma: no cover
-
-    def view_config_changes(self):
-        pass  # pragma: no cover
-
-    def config_test(self):
-        pass  # pragma: no cover
-
-    def restart(self):
-        cur_record = OrderedDict()
-        cur_record[FIELD_CMD] = COMMAND_RESTART
-        if self._is_json_mode() or self._is_handler_mode():
-            self._json_out(cur_record, True)
 
     #
     # Caller
