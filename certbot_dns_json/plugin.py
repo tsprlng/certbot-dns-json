@@ -3,20 +3,12 @@
 
 """Manual plugin on stereoids."""
 
-from builtins import bytes
-import six
-
-import atexit
 import calendar
 import collections
 import json
 import logging
 import math
 import os
-import pipes
-import shutil
-import signal
-import socket
 import subprocess
 import sys
 import tempfile
@@ -36,15 +28,9 @@ from certbot import reverter
 from certbot.display import util as display_util
 from certbot.plugins import common
 
-from six.moves import queue  # pylint: disable=import-error
-
 from certbot_dns_json import *
 
 logger = logging.getLogger(__name__)
-
-
-INITIAL_PID = os.getpid()
-
 
 class AutoJSONEncoder(json.JSONEncoder):
     """
@@ -86,63 +72,6 @@ class Authenticator(common.Plugin):
 
     description = "Manual challenge solver"
 
-    MESSAGE_TEMPLATE = {
-        "dns-01": """\
-Please deploy a DNS TXT record under the name
-{domain} with the following value:
-
-{validation}
-
-Once this is deployed,
-""",
-        "http-01": """\
-Make sure your web server displays the following content at
-{uri} before continuing:
-
-{validation}
-
-If you don't have HTTP server configured, you can run the following
-command on the target server (as root):
-
-{command}
-"""
-    }
-
-    # a disclaimer about your current IP being transmitted to Let's Encrypt's servers.
-    IP_DISCLAIMER = """\
-NOTE: The IP of this machine will be publicly logged as having requested this certificate. \
-If you're running certbot in manual mode on a machine that is not your server, \
-please ensure you're okay with that.
-
-Are you OK with your IP being logged?
-"""
-
-    # "cd /tmp/certbot" makes sure user doesn't serve /root,
-    # separate "public_html" ensures that cert.pem/key.pem are not
-    # served and makes it more obvious that Python command will serve
-    # anything recursively under the cwd
-
-    CMD_TEMPLATE = """\
-mkdir -p {root}/public_html/{achall.URI_ROOT_PATH}
-cd {root}/public_html
-echo '{validation}' > {achall.URI_ROOT_PATH}/{encoded_token}
-# run only once per server:
-$(command -v python2 || command -v python2.7 || command -v python2.6) -c \\
-"import BaseHTTPServer, SimpleHTTPServer; \\
-s = BaseHTTPServer.HTTPServer(('0.0.0.0', {port}), SimpleHTTPServer.SimpleHTTPRequestHandler); \\
-s.serve_forever()" """
-    """Command template."""
-
-    # Reporter stuff
-    HIGH_PRIORITY = 0
-    """High priority constant. See `add_message`."""
-    MEDIUM_PRIORITY = 1
-    """Medium priority constant. See `add_message`."""
-    LOW_PRIORITY = 2
-    """Low priority constant. See `add_message`."""
-
-    _msg_type = collections.namedtuple('ReporterMsg', 'priority text on_crash')
-
     def __init__(self, *args, **kwargs):
         super(Authenticator, self).__init__(*args, **kwargs)
         self._root = (tempfile.mkdtemp() if self.conf("test-mode")
@@ -157,7 +86,6 @@ s.serve_forever()" """
 
         # Reporter
         self.orig_reporter = None
-        self.messages = queue.PriorityQueue()
 
     @classmethod
     def add_parser_arguments(cls, add):
@@ -176,7 +104,6 @@ s.serve_forever()" """
         # Re-register reporter - json only report
         self.orig_reporter = zope.component.getUtility(interfaces.IReporter)
         zope.component.provideUtility(self, provides=interfaces.IReporter)
-        atexit.register(self.atexit_print_messages)
 
         # Re-register displayer - stderr only displayer
         #displayer = display_util.NoninteractiveDisplay(sys.stderr)
@@ -203,7 +130,6 @@ s.serve_forever()" """
         :return:
         """
         # pylint: disable=missing-docstring
-        self._get_ip_logging_permission()
         mapping = {"dns-01": self._perform_dns01_challenge}
         responses = []
         # TODO: group achalls by the same socket.gethostbyname(_ex)
@@ -220,82 +146,6 @@ s.serve_forever()" """
 
         input("Press return to verify...\n")
         return responses
-
-    def add_message(self, msg, priority, on_crash=True):
-        """Adds msg to the list of messages to be printed.
-
-        :param str msg: Message to be displayed to the user.
-
-        :param int priority: One of HIGH_PRIORITY, MEDIUM_PRIORITY, or
-            LOW_PRIORITY.
-
-        :param bool on_crash: Whether or not the message should be printed if
-            the program exits abnormally.
-
-        """
-        if self._is_text_mode():
-            self.orig_reporter.add_message(msg, priority, on_crash=on_crash)
-            return
-
-        assert self.HIGH_PRIORITY <= priority <= self.LOW_PRIORITY
-        self.messages.put(self._msg_type(priority, msg, on_crash))
-        logger.debug("Reporting to user: %s", msg)
-        pass
-
-    def print_messages(self):
-        """Prints messages to the user and clears the message queue."""
-        if self._is_text_mode():
-            self.orig_reporter.print_messages()
-            return
-
-        no_exception = sys.exc_info()[0] is None
-        messages = []
-        while not self.messages.empty():
-            msg = self.messages.get()
-            if self.config.quiet:
-                # In --quiet mode, we only print high priority messages that
-                # are flagged for crash cases
-                if not (msg.priority == self.HIGH_PRIORITY and msg.on_crash):
-                    continue
-            if no_exception or msg.on_crash:
-                cur_message = OrderedDict()
-                cur_message['priority'] = msg.priority
-                cur_message['on_crash'] = msg.on_crash
-                cur_message['lines'] = msg.text.splitlines()
-                messages.append(cur_message)
-
-        data = OrderedDict()
-        data[FIELD_CMD] = COMMAND_REPORT
-        data['messages'] = messages
-        self._json_out(data, True)
-        pass
-
-    def atexit_print_messages(self, pid=None):
-        """Function to be registered with atexit to print messages.
-
-        :param int pid: Process ID
-
-        """
-        if pid is None:
-            pid = INITIAL_PID
-        # This ensures that messages are only printed from the process that
-        # created the Reporter.
-        if pid == os.getpid():
-            self.print_messages()
-
-    @classmethod
-    def _test_mode_busy_wait(cls, port):
-        while True:
-            time.sleep(1)
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                sock.connect(("localhost", port))
-            except socket.error:  # pragma: no cover
-                pass
-            else:
-                break
-            finally:
-                sock.close()
 
     def cleanup(self, achalls):
         pass
@@ -627,43 +477,3 @@ s.serve_forever()" """
             json_str += '\n'
         sys.stdout.write(json_str)
         sys.stdout.flush()
-
-    def _json_out_and_wait(self, data):
-        """
-        Dumps data as JSON to stdout and waits for prompt
-        :param data:
-        :return:
-        """
-        # pylint: disable=no-self-use
-        self._json_out(data, True)
-        six.moves.input("")
-
-    def _notify_and_wait(self, message):
-        """
-        Writes message to the stdout and waits for user confirmation
-        :param message:
-        :return:
-        """
-        # pylint: disable=no-self-use
-        sys.stdout.write(message)
-        sys.stdout.write("Press ENTER to continue")
-        sys.stdout.flush()
-        six.moves.input("")
-
-    def _get_ip_logging_permission(self):
-        """
-        Configures public ip logging config keys from the env.
-        :return:
-        """
-        self.config.namespace.certbot_external_auth_out_public_ip_logging_ok = True
-        self.config.namespace.manual_public_ip_logging_ok = True
-
-    def _get_message(self, achall):
-        """
-        Retrieves text message to display for the challange from templates
-        :param achall:
-        :return:
-        """
-        # pylint: disable=no-self-use,unused-argument
-        return self.MESSAGE_TEMPLATE.get(achall.chall.typ, "")
-
