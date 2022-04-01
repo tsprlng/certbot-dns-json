@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Manual plugin on stereoids."""
-
 import collections
 import json
 import logging
