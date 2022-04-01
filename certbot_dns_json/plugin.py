@@ -93,8 +93,6 @@ class Authenticator(common.Plugin):
             help="Test mode. Executes the manual command in subprocess.")
         add("public-ip-logging-ok", action="store_true",
             help="Automatically allows public IP logging.")
-        add("text-mode", action="store_true",
-            help="Original text mode, by default turned off, produces JSON challenges")
         add("handler", default=None,
             help="Handler program that takes the action. Data is transferred in ENV vars")
         add("dehydrated-dns", action="store_true",
@@ -371,19 +369,12 @@ class Authenticator(common.Plugin):
         except:
             return fpath
 
-    def _is_text_mode(self):
-        """
-        Returns true if text-mode is selected
-        :return:
-        """
-        return self.conf("text-mode")
-
     def _is_json_mode(self):
         """
         Returns true if json mode is selected
         :return:
         """
-        return not self._is_text_mode() and not self._is_handler_mode()
+        return not self._is_handler_mode()
 
     def _is_handler_mode(self):
         """
