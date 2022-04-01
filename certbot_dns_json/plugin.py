@@ -102,9 +102,9 @@ class Authenticator(common.Plugin, interfaces.Authenticator):
         #json_data[FIELD_CMD] = COMMAND_PERFORM
         #json_data[FIELD_TYPE] = achall.chall.typ
         json_data[FIELD_DOMAIN] = achall.domain
-        #json_data[FIELD_VALIDATION] = validation
+        json_data[FIELD_VALIDATION] = validation
         #json_data[FIELD_TXT_DOMAIN] = achall.validation_domain_name(achall.domain)
-        json_data[FIELD_KEY_AUTH] = response.key_authorization
+        #json_data[FIELD_KEY_AUTH] = response.key_authorization
 
         json_data = self._json_sanitize_dict(json_data)
 
