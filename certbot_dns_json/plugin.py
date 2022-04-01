@@ -12,7 +12,6 @@ from acme import challenges
 
 from certbot import errors
 from certbot import interfaces
-from certbot import reverter
 from certbot.plugins import common
 
 from certbot_dns_json import *
@@ -57,10 +56,6 @@ class Authenticator(common.Plugin, interfaces.Authenticator):
 
     def __init__(self, *args, **kwargs):
         super(Authenticator, self).__init__(*args, **kwargs)
-
-        # Set up reverter
-        self.reverter = reverter.Reverter(self.config)
-        self.reverter.recovery_routine()
 
     @classmethod
     def add_parser_arguments(cls, add):
