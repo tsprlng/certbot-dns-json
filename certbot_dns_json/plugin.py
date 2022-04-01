@@ -3,17 +3,14 @@
 
 import json
 import logging
-import math
 import os
 import subprocess
 import sys
-import time
 import datetime
 
 from collections import OrderedDict
 
 from acme import challenges
-from acme import errors as acme_errors
 
 from certbot import errors
 from certbot import interfaces
@@ -72,8 +69,6 @@ class Authenticator(common.Plugin, interfaces.Authenticator):
     def add_parser_arguments(cls, add):
         add("test-mode", action="store_true",
             help="Test mode. Executes the manual command in subprocess.")
-        add("public-ip-logging-ok", action="store_true",
-            help="Automatically allows public IP logging.")
         add("handler", default=None,
             help="Handler program that takes the action. Data is transferred in ENV vars")
         add("dehydrated-dns", action="store_true",
